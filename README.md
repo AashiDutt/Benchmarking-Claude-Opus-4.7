@@ -23,10 +23,13 @@ pip install -r requirements.txt
 cp .env.example .env
 # Set OPENROUTER_API_KEY and/or ANTHROPIC_API_KEY (see .env.example)
 
-# Single task, model axis only
+# Question: does Opus 4.7 maintain context better than 4.6? (single task, cheap validation)
 python benchmark.py --task T1 --axis model
 
-# Full benchmark (all axes; task_budget axis needs direct Anthropic API)
+# Question: does effort level change memory coherence? (hard tasks only)
+python benchmark.py --axis effort
+
+# Full study — all axes, all tasks
 python benchmark.py
 ```
 
