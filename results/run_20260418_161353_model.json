@@ -1,0 +1,40 @@
+[
+  {
+    "task_id": "T1",
+    "task_title": "Cascading schema migration across three dependent services",
+    "model": "anthropic/claude-opus-4-7",
+    "effort": "high",
+    "task_budget": null,
+    "constraint_citations": 3,
+    "step_coherence_score": 5,
+    "self_corrections": 0,
+    "memory_failure": true,
+    "pass_at_1": true,
+    "latency_s": 63.5,
+    "input_tokens": 885,
+    "output_tokens": 6446,
+    "cost_usd": 0.165575,
+    "run_id": "20260418_161353",
+    "timestamp": "2026-04-18T16:14:57.205444+00:00",
+    "response_excerpt": "# Step 1: Foreign Key Inventory  Reading the schema, there are exactly **two** FK constraints across the three tables:  1. `orders.user_id \u2192 users.id` 2. `events.user_id \u2192 users.id`  (The `id` columns are primary keys, not foreign keys. `users` has no outbound FKs.)  Important Postgres detail that w"
+  },
+  {
+    "task_id": "T1",
+    "task_title": "Cascading schema migration across three dependent services",
+    "model": "anthropic/claude-opus-4-6",
+    "effort": "high",
+    "task_budget": null,
+    "constraint_citations": 3,
+    "step_coherence_score": 5,
+    "self_corrections": 3,
+    "memory_failure": true,
+    "pass_at_1": true,
+    "latency_s": 154.64,
+    "input_tokens": 667,
+    "output_tokens": 7432,
+    "cost_usd": 0.189135,
+    "run_id": "20260418_161353",
+    "timestamp": "2026-04-18T16:17:31.843951+00:00",
+    "response_excerpt": "# Adversarial Schema Migration Review  ## Step 1 \u2014 Foreign Key Inventory  Examining every declared FK in the schema:  | # | Constraint | From | To | |---|-----------|------|----| | 1 | `orders.user_id` | `orders` | `users.id` | | 2 | `events.user_id` | `events` | `users.id` |  **Total existing FK co"
+  }
+]

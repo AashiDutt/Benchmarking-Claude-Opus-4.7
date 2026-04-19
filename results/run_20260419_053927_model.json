@@ -1,0 +1,40 @@
+[
+  {
+    "task_id": "T1",
+    "task_title": "Cascading schema migration across three dependent services",
+    "model": "anthropic/claude-opus-4-7",
+    "effort": "high",
+    "task_budget": null,
+    "constraint_citations": 0,
+    "step_coherence_score": 0,
+    "self_corrections": 0,
+    "memory_failure": true,
+    "pass_at_1": false,
+    "latency_s": 0.88,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "cost_usd": 0.0,
+    "run_id": "20260419_053927",
+    "timestamp": "2026-04-19T05:39:27.914710+00:00",
+    "response_excerpt": "ERROR: <!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1, minimum-scale=1\"/><link rel=\"stylesheet\" href=\"/_next/static/css/cda3af1"
+  },
+  {
+    "task_id": "T1",
+    "task_title": "Cascading schema migration across three dependent services",
+    "model": "anthropic/claude-opus-4-6",
+    "effort": "high",
+    "task_budget": null,
+    "constraint_citations": 0,
+    "step_coherence_score": 0,
+    "self_corrections": 0,
+    "memory_failure": true,
+    "pass_at_1": false,
+    "latency_s": 0.52,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "cost_usd": 0.0,
+    "run_id": "20260419_053927",
+    "timestamp": "2026-04-19T05:39:28.434947+00:00",
+    "response_excerpt": "ERROR: <!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1, minimum-scale=1\"/><link rel=\"stylesheet\" href=\"/_next/static/css/cda3af1"
+  }
+]
