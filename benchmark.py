@@ -45,13 +45,11 @@ console = Console()
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 
-# Direct Anthropic model strings
 MODELS = {
     "opus_4_7": "claude-opus-4-7",
     "opus_4_6": "claude-opus-4-6",
 }
 
-# OpenRouter requires anthropic/ prefix
 OPENROUTER_MODELS = {
     "opus_4_7": "anthropic/claude-opus-4-7",
     "opus_4_6": "anthropic/claude-opus-4-6",
@@ -67,11 +65,10 @@ PRICING = {
     "anthropic/claude-opus-4-6": {"input": 5.00, "output": 25.00},
 }
 
-EFFORT_LEVELS        = ["standard", "high", "xhigh"]
-RESULTS_DIR          = os.getenv("RESULTS_DIR", "./results")
-# Anthropic SDK appends /v1/messages — must NOT end with /api/v1
-OPENROUTER_BASE_URL  = os.getenv("ANTHROPIC_BASE_URL", "https://openrouter.ai/api")
-HTTP_TIMEOUT_S       = float(os.getenv("BENCHMARK_HTTP_TIMEOUT_S", "3600"))
+EFFORT_LEVELS       = ["standard", "high", "xhigh"]
+RESULTS_DIR         = os.getenv("RESULTS_DIR", "./results")
+OPENROUTER_BASE_URL = os.getenv("ANTHROPIC_BASE_URL", "https://openrouter.ai/api")
+HTTP_TIMEOUT_S      = float(os.getenv("BENCHMARK_HTTP_TIMEOUT_S", "3600"))
 
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
@@ -79,10 +76,6 @@ os.makedirs(RESULTS_DIR, exist_ok=True)
 # ── Client factory ─────────────────────────────────────────────────────────────
 
 def make_client():
-    """
-    Returns (client, model_map, judge_model, using_openrouter).
-    OPENROUTER_API_KEY takes precedence if both keys are present.
-    """
     openrouter_key = os.getenv("OPENROUTER_API_KEY")
     anthropic_key  = os.getenv("ANTHROPIC_API_KEY")
 
@@ -93,7 +86,6 @@ def make_client():
             "self_corrections scored from response text. "
             "Axis 3 (task_budget) will be skipped.[/yellow]\n"
         )
-        # Bearer token; avoid empty ANTHROPIC_API_KEY forcing X-Api-Key: ""
         saved = os.environ.pop("ANTHROPIC_API_KEY", None)
         try:
             client = anthropic.Anthropic(
@@ -111,10 +103,7 @@ def make_client():
         client = anthropic.Anthropic(api_key=anthropic_key)
         return client, MODELS, JUDGE_MODEL, False
 
-    console.print(
-        "[red]No API key found. "
-        "Set OPENROUTER_API_KEY or ANTHROPIC_API_KEY in .env[/red]"
-    )
+    console.print("[red]No API key found. Set OPENROUTER_API_KEY or ANTHROPIC_API_KEY in .env[/red]")
     sys.exit(1)
 
 
@@ -144,10 +133,6 @@ class TaskResult:
 # ── Scoring ────────────────────────────────────────────────────────────────────
 
 def judge_memory_failure(client, judge_model, task, response_text):
-    """
-    LLM-as-judge: did the model violate its step 1 constraint in steps 4-5?
-    Binary YES/NO using a cheap model. Falls back to False on error.
-    """
     prompt = f"""You are evaluating a model's response to a multi-step engineering problem.
 
 The task established this constraint in Step 1:
@@ -173,9 +158,7 @@ Answer with exactly one word: YES or NO.
             messages=[{"role": "user", "content": prompt}],
             timeout=min(120.0, HTTP_TIMEOUT_S),
         )
-        text = "".join(
-            b.text for b in resp.content if getattr(b, "type", None) == "text"
-        )
+        text = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
         return text.strip().upper().startswith("YES")
     except Exception as e:
         console.print(f"    [yellow]Judge call failed ({e}), defaulting NO[/yellow]")
@@ -183,28 +166,22 @@ Answer with exactly one word: YES or NO.
 
 
 def score_response(task, response_text, thinking_text, client, judge_model):
-    response_lower  = response_text.lower()
-    thinking_lower  = (thinking_text or "").lower()
-    hints           = task["verification_hints"]
-    constraint      = task["constraint_to_track"].lower()
+    response_lower = response_text.lower()
+    thinking_lower = (thinking_text or "").lower()
+    hints          = task["verification_hints"]
+    constraint     = task["constraint_to_track"].lower()
 
-    # Constraint citation count
-    constraint_keywords = [w for w in constraint.split() if len(w) > 4]
-    constraint_citations = sum(
-        1 for kw in constraint_keywords if response_lower.count(kw) > 0
-    )
+    constraint_keywords  = [w for w in constraint.split() if len(w) > 4]
+    constraint_citations = sum(1 for kw in constraint_keywords if response_lower.count(kw) > 0)
 
-    # Memory failure — LLM-as-judge
     memory_failure = judge_memory_failure(client, judge_model, task, response_text)
 
-    # Step coherence
     hints_found = sum(
         1 for hint in hints
         if any(kw in response_lower for kw in hint.lower().split()[:4])
     )
     step_coherence_score = min(hints_found + 1, task["expected_steps"])
 
-    # Self-corrections — thinking blocks if available, else response text
     correction_phrases = [
         "wait,", "actually,", "let me reconsider", "i made an error",
         "that's wrong", "i need to correct", "on second thought",
@@ -231,36 +208,20 @@ def calculate_cost(model, input_tokens, output_tokens):
 
 
 _EFFORT_SYSTEM_NOTES = {
-    "standard": (
-        "Apply moderate reasoning depth — be concise but still complete every step."
-    ),
-    "high": (
-        "Apply strong reasoning depth — check each step carefully before moving on."
-    ),
-    "xhigh": (
-        "Apply maximum reasoning depth — be exhaustive; self-check and correct when needed."
-    ),
-    "max": (
-        "Apply maximum reasoning depth — be exhaustive; self-check and correct when needed."
-    ),
+    "standard": "Apply moderate reasoning depth — be concise but still complete every step.",
+    "high":     "Apply strong reasoning depth — check each step carefully before moving on.",
+    "xhigh":    "Apply maximum reasoning depth — be exhaustive; self-check and correct when needed.",
+    "max":      "Apply maximum reasoning depth — be exhaustive; self-check and correct when needed.",
 }
 
 
-def _system_with_effort(base: str, effort: str) -> str:
+def _system_with_effort(base, effort):
     note = _EFFORT_SYSTEM_NOTES.get(effort, _EFFORT_SYSTEM_NOTES["high"])
     return f"{base}\n\nEffort setting for this run: {effort}. {note}"
 
 
-def _thinking_for_effort(effort: str, max_tokens: int) -> dict:
-    """SDK-supported extended thinking (type enabled + budget_tokens)."""
-    headroom = 12288
-    cap = max(1024, max_tokens - headroom)
-    frac = {"standard": 0.20, "high": 0.38, "xhigh": 0.55, "max": 0.55}.get(
-        effort, 0.38
-    )
-    budget = max(1024, min(cap, int(max_tokens * frac)))
-    budget = min(budget, max_tokens - 1025)
-    return {"type": "enabled", "budget_tokens": budget}
+def _api_effort(effort):
+    return {"standard": "medium", "high": "high", "xhigh": "xhigh", "max": "max"}.get(effort, "high")
 
 
 # ── Core runner ────────────────────────────────────────────────────────────────
@@ -280,10 +241,9 @@ Critical instructions:
 - Be precise. Vague answers will miss the bugs.
 """
     system_prompt = _system_with_effort(system_base, effort)
-
-    max_tokens  = 64000 if effort in ("xhigh", "max") else 32000
-    use_beta    = task_budget is not None and not using_openrouter
-    start_time  = time.time()
+    max_tokens    = 64000 if effort in ("xhigh", "max") else 32000
+    use_beta      = task_budget is not None and not using_openrouter
+    start_time    = time.time()
 
     try:
         base_kwargs = dict(
@@ -293,36 +253,29 @@ Critical instructions:
             messages=[{"role": "user", "content": task["description"]}],
         )
 
-        # messages.stream() does not accept output_config as a keyword — use extra_body.
-        extra_body = None
+        # ── KEY FIX: pass output_config and thinking as top-level kwargs.
+        # extra_body is NOT forwarded by messages.stream() to the API request
+        # body — only top-level kwargs reach the wire. This was the root cause
+        # of thinking blocks being empty and effort having no effect.
         if not using_openrouter:
-            base_kwargs["thinking"] = _thinking_for_effort(effort, max_tokens)
-            extra_body = {"output_config": {"effort": effort}}
+            base_kwargs["thinking"]      = {"type": "adaptive"}
+            base_kwargs["output_config"] = {"effort": _api_effort(effort)}
             if use_beta:
-                extra_body["output_config"]["task_budget"] = {
+                base_kwargs["output_config"]["task_budget"] = {
                     "type": "tokens",
                     "total": task_budget,
                 }
 
         if use_beta:
-            beta_kw = {
+            stream_ctx = client.beta.messages.stream(
                 **base_kwargs,
-                "betas": ["task-budgets-2026-03-13"],
-                "timeout": HTTP_TIMEOUT_S,
-            }
-            if extra_body is not None:
-                beta_kw["extra_body"] = extra_body
-            stream_ctx = client.beta.messages.stream(**beta_kw)
+                betas=["task-budgets-2026-03-13"],
+                timeout=HTTP_TIMEOUT_S,
+            )
         else:
             if task_budget and using_openrouter:
-                console.print(
-                    "    [yellow]task_budget skipped — "
-                    "not supported on OpenRouter[/yellow]"
-                )
-            stream_kw = {**base_kwargs, "timeout": HTTP_TIMEOUT_S}
-            if extra_body is not None:
-                stream_kw["extra_body"] = extra_body
-            stream_ctx = client.messages.stream(**stream_kw)
+                console.print("    [yellow]task_budget skipped — not supported on OpenRouter[/yellow]")
+            stream_ctx = client.messages.stream(**base_kwargs, timeout=HTTP_TIMEOUT_S)
 
         response_text = ""
         thinking_text = ""
@@ -345,6 +298,11 @@ Critical instructions:
             console.print(
                 "    [dim]thinking blocks empty — "
                 "self_corrections scored from response text[/dim]"
+            )
+        else:
+            console.print(
+                f"    [green]thinking blocks present — "
+                f"{len(thinking_text)} chars[/green]"
             )
 
         cost   = calculate_cost(model, input_tokens, output_tokens)
@@ -386,9 +344,7 @@ Critical instructions:
 # ── Benchmark axes ─────────────────────────────────────────────────────────────
 
 def run_axis_model(client, model_map, judge_model, using_openrouter, tasks, run_id):
-    console.print(
-        "\n[bold cyan]Axis 1: Model Comparison — Opus 4.7 vs Opus 4.6 (high effort)[/bold cyan]"
-    )
+    console.print("\n[bold cyan]Axis 1: Model Comparison — Opus 4.7 vs Opus 4.6 (high effort)[/bold cyan]")
     results = []
     for task in tasks:
         for key, model_id in model_map.items():
@@ -406,9 +362,7 @@ def run_axis_model(client, model_map, judge_model, using_openrouter, tasks, run_
 
 
 def run_axis_effort(client, model_map, judge_model, using_openrouter, tasks, run_id):
-    console.print(
-        "\n[bold cyan]Axis 2: Effort Calibration — xhigh vs high vs standard (Opus 4.7)[/bold cyan]"
-    )
+    console.print("\n[bold cyan]Axis 2: Effort Calibration — xhigh vs high vs standard (Opus 4.7)[/bold cyan]")
     results    = []
     hard_tasks = [t for t in tasks if t["difficulty"] in ("hard", "expert")]
     opus_47    = model_map["opus_4_7"]
